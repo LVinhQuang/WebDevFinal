@@ -23,8 +23,9 @@ import Transaction from './components/Account/Transaction.js';
 import EditInfo from "./components/Account/EditInfo.js";
 import Auth from './pages/Auth.js'
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import TopUp from './components/Account/TopUp.js';
 function App() {
-  const [inPath , setInPath] = useState()
+  const [inPath, setInPath] = useState()
   const [login, logout, token, userId, role] = AuthHook();
   const location = useLocation()
   const navigate = useNavigate()
@@ -33,65 +34,65 @@ function App() {
     console.log("role in app", role);
   }, [])
 
-  useEffect(()=> {
+  useEffect(() => {
     setInPath(location.pathname)
-    if(location.pathname === "/")
-    {
+    if (location.pathname === "/") {
       navigate('/home')
     }
-  },[])
+  }, [])
   console.log(inPath)
-  useEffect(()=> {
-    if(token){
+  useEffect(() => {
+    if (token) {
       navigate(inPath)
     }
-  },[token])
+  }, [token])
 
   return (
     <>
-      
-        <AuthContext.Provider
-          value={
-            {
-              isLoggedIn: !!token,
-              login,
-              logout,
-              userId,
-              role,
-              token
-            }
+
+      <AuthContext.Provider
+        value={
+          {
+            isLoggedIn: !!token,
+            login,
+            logout,
+            userId,
+            role,
+            token
           }
-        >
-          <Routes>
-          
+        }
+      >
+        <Routes>
+
           <Route path='/home' exact element={<Home />} />
           {/* <Route path=''exact element={<Navigate to="/home" />} /> */}
-          <Route path='/*' element={<Shop/>} />
-            <Route path='/admin/*' element={<Admin />} />
-            {(
-              <Route path="/account" element={<AccountLayout />}>
-                { token &&
-                  <>
-                <Route index element={<AccountDashboard />} />
-                <Route path="editinfo" element={<EditInfo />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="password" element={<Password />} />
-                <Route path="transaction" element={<Transaction />} />
+          <Route path='/*' element={<Shop />} />
+          <Route path='/admin/*' element={<Admin />} />
+          {(
+            <Route path="/account" element={<AccountLayout />}>
+              {token &&
+                <>
+                  <Route index element={<AccountDashboard />} />
+                  <Route path="editinfo" element={<EditInfo />} />
+                  <Route path="orders" element={<Orders />} />
+                  <Route path="password" element={<Password />} />
+                  <Route path="transaction" element={<Transaction />} />
+                  <Route path='topup' element={<TopUp />} />
                 </>
-                }
-              </Route>
-            )}
-            {
-              !token &&
-              <>
-                <Route path="/login" element={<Auth />} />
-                <Route path="/*" element={<Navigate to="/login"/>} />
-              </>
-            }
-            
-          </Routes>
-        </AuthContext.Provider>
-      
+              }
+            </Route>
+          )}
+          {
+            !token &&
+            <>
+              <Route path="/login" element={<Auth />} />
+              <Route path="/*" element={<Navigate to="/login" />} />
+            </>
+          }
+
+        </Routes>
+      </AuthContext.Provider>
+
     </>
   );
 }
