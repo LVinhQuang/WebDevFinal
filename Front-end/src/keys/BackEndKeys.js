@@ -1,4 +1,4 @@
-const protocol = "https://"
+const protocol = "http://"
 export const BACK_END_SERVER =protocol + "localhost:5000"
 export const SIGN_IN_API = protocol + "localhost:5000/api/account/login"
 export const SIGN_UP_API = protocol + "localhost:5000/api/account/register"

@@ -18,6 +18,7 @@ const port = process.env.PORT || 5000;
 const secret = "My secret";
 const searchC = require("./controllers/search.c.js");
 const adminRoute = require("./routes/admin.js");
+const topupRoute = require("./routes/topup.r.js");
 
 const {ProdStats, AccStats, OrderStats, CatStats} = require('./utils/statistic');
 
@@ -72,6 +73,7 @@ app.use("/api/product", productRoute);
 app.use("/api/admin", adminRoute);
 app.use('/api/order',orderRoute)
 app.use("/api/trans", require("./routes/transaction.r.js"));
+app.use("/api/topup", topupRoute);
 //app.use("/auth", authGoogleRoute);
 
 app.use("/api/search", searchC.search);
@@ -86,11 +88,11 @@ app.use((error, req, res, next) => {
   res.json({ message: error.message || "There some errors occured " });
 });
 
-// const server = http.createServer(app);
-const server = https.createServer({
-    key: fs.readFileSync(path.join(__dirname,'cert','key.pem')),
-    cert: fs.readFileSync(path.join(__dirname,'cert','cert.pem'))
-}, app);
+const server = http.createServer(app);
+// const server = https.createServer({
+//     key: fs.readFileSync(path.join(__dirname,'cert','key.pem')),
+//     cert: fs.readFileSync(path.join(__dirname,'cert','cert.pem'))
+// }, app);
 
 const io = new Server(server, {
   cors: {
