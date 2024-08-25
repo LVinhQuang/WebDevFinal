@@ -1,5 +1,8 @@
 const { createHmac } = require('node:crypto')
 const axios = require('axios');
+const jwt = require('jsonwebtoken')
+const jwtSecondKey = process.env.JWT_SECOND
+const HttpError = require("../models/http-error");
 
 const config = {
     appid: "2554",
@@ -26,17 +29,17 @@ module.exports = {
 
         const expire_duration_seconds = 900;
 
-        const amount = req.body.amount;
+        const amount = req.query.amount;
 
         const item = JSON.stringify([{ "itemid": "naptien", "itemname": "Nap tien vao tai khoan", "itemprice": amount, "itemquantity": 1 }])
 
         const description = `Zalo - Thanh toán đơn hàng ${app_trans_id}`;
 
-        const embed_data = JSON.stringify({ "amount": amount, "userID": req.body.userID, "redirecturl": "http://localhost:3000" });
+        const embed_data = JSON.stringify({ "amount": amount, "userID": +req.query.userID });
 
         const bank_code = "";
 
-        const callback_url = "https://0dfd-2a09-bac5-d407-e6-00-17-2f5.ngrok-free.app/api/topup/zalo/callback"
+        const callback_url = process.env.ZALO_CALLBACK_URL + "/api/topup/zalo/callback"
 
         //mac
         let data_to_encode = config.appid + "|" + app_trans_id + '|' + app_user + '|' + amount + '|' + app_time + '|' + embed_data + '|' + item;
@@ -60,12 +63,15 @@ module.exports = {
             callback_url
         };
 
-        console.log(params);
-
         axios.post(config.endpoint, null, { params: params })
             .then(response => {
-                console.log(response.data);
-                res.json({ data: response.data });
+                if (response.data.return_code == 1) {
+                    const order_url = response.data.order_url;
+                    res.status(200).json({order_url});
+                }
+                else {
+                    console.log("FAILED WITH RETURN CODE: ",return_code);
+                }
             })
             .catch(e => {
                 console.log(e);
@@ -84,9 +90,38 @@ module.exports = {
             console.log("WRONG");
             res.sendStatus(400);
         } else {
-            console.log(req.body);
-            // kiểm tra xem đã nhận được callback hay chưa, nếu chưa thì tiến hành gọi API truy vấn trạng thái thanh toán của đơn hàng để lấy kết quả cuối cùng
-            res.sendStatus(200);
+            let data = JSON.parse(JSON.parse(req.body.data).embed_data);
+            let amount = data.amount;
+            let userId = data.userID;
+
+            try {
+                const token = jwt.sign(
+                    {
+                        userId
+                    },
+                    jwtSecondKey,
+                    {expiresIn: "1h"}
+                )
+                const response = await axios.post('https://localhost:5001/api/topup', {
+                    userId: userId,
+                    amount: amount
+                } ,{
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+
+                res.sendStatus(200);
+            } catch (err) {
+                console.error(err)
+                const error = new HttpError(
+                    'Something wrong when add jwt in transaction controller', 500
+                );
+                return next(error);
+            }
         }
-    }
+    },
+
+    
 }

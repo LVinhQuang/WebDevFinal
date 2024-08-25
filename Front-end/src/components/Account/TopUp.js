@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import momo_svg from "../../assets/images/momo_square_pinkbg.svg"
-import { colors } from '@mui/material';
 import zalo_png from "../../assets/images/zalo.png"
+import axios from "axios"
+import { BACK_END_SERVER, TOPUP_API } from '../../keys/BackEndKeys';
 
 export default function TopUp() {
     const [amount,setAmount] = useState(0);
@@ -14,7 +15,7 @@ export default function TopUp() {
     const handleOptionChange = (event) => {
         setSelectedOption(event.target.value);
     }
-    const submit_onclick = () => {
+    const submit_onclick = async () => {
         let intAmount = parseInt(amount);
         if (!intAmount || !selectedOption) {
             setErrMess("Vui lòng điền đầy đủ thông tin")
@@ -23,8 +24,15 @@ export default function TopUp() {
         else {
             setErrMess("")
         }
-
-        console.log(amount,selectedOption);
+        
+        let zalo_create_api = TOPUP_API + '/zalo/create'
+        let userID = JSON.parse(localStorage.getItem('userData')).userId;
+        let params = {amount, userID}
+        console.log(amount, userID);
+        const create_response = await axios.get(zalo_create_api, {params})
+        const order_url = create_response.data.order_url;
+        window.open(order_url, '_blank', 'width=800,height=600,toolbar=no,scrollbars=yes,resizable=yes');
+        
     }
     return (
         <>

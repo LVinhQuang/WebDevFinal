@@ -5,7 +5,7 @@ module.exports = class Trans {
     static async getBalanceByID(id) {
         try {
             const data = await db.oneOrNone(`SELECT "Balance" FROM "Account" WHERE "AccID" = $1`, [id]);
-            return data;
+            return +data.Balance;
         } catch (err) {
             throw err;
         }

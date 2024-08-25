@@ -5,6 +5,7 @@ const express = require('express');
 //import router 
 const AccRouter = require("./routes/acc.r")
 const TransRouter = require("./routes/trans.r")
+const topupRouter = require("./routes/topup.r")
 const https = require('https')
 const path = require('path')
 const fs = require('fs')
@@ -32,6 +33,7 @@ app.use ((req,res,next) => {
 app.use(checkAuth)
 app.use("/api/account", AccRouter);
 app.use("/api/trans", TransRouter);
+app.use("/api/topup", topupRouter)
 
 app.use((error, req, res, next) => {
     // Check that Have the res been sent ?
