@@ -37,7 +37,7 @@ module.exports = class Account {
 
     static async getIdByUserID(userId) {
         try {
-            const data = await db.one(`SELECT "AccID" FROM "Account" WHERE "ShopID" = '$1'`, [userId]);
+            const data = await db.one(`SELECT "AccID" FROM "Account" WHERE "ShopID" = $1`, [userId]);
             return data.AccID;
         }
         catch (err) {

@@ -3,6 +3,7 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken')
 const jwtSecondKey = process.env.JWT_SECOND
 const HttpError = require("../models/http-error");
+const qs = require('qs')
 
 const config = {
     appid: "2554",
@@ -14,14 +15,7 @@ const config = {
 module.exports = {
     createOrder: async (req, res, next) => {
 
-        //app_trans_id
-        const today = new Date();
-        const year = String(today.getFullYear()).slice(-2); // Lấy 2 chữ số cuối của năm
-        const month = String(today.getMonth() + 1).padStart(2, '0'); // Lấy tháng (cộng 1 vì tháng bắt đầu từ 0), thêm số 0 nếu cần
-        const day = String(today.getDate()).padStart(2, '0'); // Lấy ngày, thêm số 0 nếu cần
-        const yymmdd = `${year}${month}${day}`;
-        let randomNumber = Math.floor(Math.random() * 1000); // Số ngẫu nhiên từ 0 đến 999
-        const app_trans_id = yymmdd + '_' + randomNumber.toString();
+        const app_trans_id = req.query.app_trans_id;
 
         const app_user = "ZaloPayDemo";
 
@@ -29,13 +23,13 @@ module.exports = {
 
         const expire_duration_seconds = 900;
 
-        const amount = req.query.amount;
+        const amount = +req.query.amount;
 
         const item = JSON.stringify([{ "itemid": "naptien", "itemname": "Nap tien vao tai khoan", "itemprice": amount, "itemquantity": 1 }])
 
         const description = `Zalo - Thanh toán đơn hàng ${app_trans_id}`;
 
-        const embed_data = JSON.stringify({ "amount": amount, "userID": +req.query.userID });
+        const embed_data = JSON.stringify({ "amount": amount, "userID": req.query.userID });
 
         const bank_code = "";
 
@@ -67,10 +61,11 @@ module.exports = {
             .then(response => {
                 if (response.data.return_code == 1) {
                     const order_url = response.data.order_url;
-                    res.status(200).json({order_url});
+                    res.status(200).json({ order_url });
                 }
                 else {
-                    console.log("FAILED WITH RETURN CODE: ",return_code);
+                    console.log("FAILED WITH RETURN CODE: ", return_code);
+                    res.sendStatus(500);
                 }
             })
             .catch(e => {
@@ -100,12 +95,12 @@ module.exports = {
                         userId
                     },
                     jwtSecondKey,
-                    {expiresIn: "1h"}
+                    { expiresIn: "1h" }
                 )
                 const response = await axios.post('https://localhost:5001/api/topup', {
                     userId: userId,
                     amount: amount
-                } ,{
+                }, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -113,6 +108,7 @@ module.exports = {
                 })
 
                 res.sendStatus(200);
+
             } catch (err) {
                 console.error(err)
                 const error = new HttpError(
@@ -123,5 +119,33 @@ module.exports = {
         }
     },
 
-    
+    checkOrderStatus: async (req, res, next) => {
+
+        let postData = {
+            app_id: config.appid,
+            app_trans_id: "<app_trans_id>", // Input your app_trans_id
+        }
+
+        let data = postData.app_id + "|" + postData.app_trans_id + "|" + config.key1; // appid|app_trans_id|key1
+        postData.mac = CryptoJS.HmacSHA256(data, config.key1).toString();
+
+
+        let postConfig = {
+            method: 'post',
+            url: config.endpoint,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            data: qs.stringify(postData)
+        };
+
+        axios(postConfig)
+            .then(function (response) {
+                console.log(JSON.stringify(response.data));
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+    }
+
 }

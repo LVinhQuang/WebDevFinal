@@ -1,12 +1,18 @@
-import React, { useState } from 'react'
+import React, { useState, useContext, useEffect } from 'react'
 import momo_svg from "../../assets/images/momo_square_pinkbg.svg"
 import zalo_png from "../../assets/images/zalo.png"
 import axios from "axios"
 import { BACK_END_SERVER, TOPUP_API } from '../../keys/BackEndKeys';
+import { AuthContext } from "../../context/AuthContext.js";
+import { useHttpClient } from '../../hooks/http-hook';
+import { ACCOUNT_API as accountApi } from '../../keys/BackEndKeys';
 
 export default function TopUp() {
     const [amount,setAmount] = useState(0);
     const [selectedOption, setSelectedOption] = useState('');
+    const { token, userId } = useContext(AuthContext);
+    const [balance, setBalance] = useState(0);
+    const { sendRequest } = useHttpClient();
     const [errMess, setErrMess] = useState(false);
     const handleAmountChange = (event) => {
         setAmount(event.target.value);
@@ -25,19 +31,61 @@ export default function TopUp() {
             setErrMess("")
         }
         
-        let zalo_create_api = TOPUP_API + '/zalo/create'
+        //create params for the transaction
         let userID = JSON.parse(localStorage.getItem('userData')).userId;
-        let params = {amount, userID}
-        console.log(amount, userID);
+            //create app_trans_id
+        const today = new Date();
+        const year = String(today.getFullYear()).slice(-2); // Lấy 2 chữ số cuối của năm
+        const month = String(today.getMonth() + 1).padStart(2, '0'); // Lấy tháng (cộng 1 vì tháng bắt đầu từ 0), thêm số 0 nếu cần
+        const day = String(today.getDate()).padStart(2, '0'); // Lấy ngày, thêm số 0 nếu cần
+        const yymmdd = `${year}${month}${day}`;
+        let randomNumber = Math.floor(Math.random() * 1000); // Số ngẫu nhiên từ 0 đến 999
+        const app_trans_id = yymmdd + '_' + randomNumber.toString();
+
+        let params = {amount, userID, app_trans_id}
+        console.log(params);
+
+        //send request to create transaction
+        let zalo_create_api = TOPUP_API + '/zalo/create'
         const create_response = await axios.get(zalo_create_api, {params})
-        const order_url = create_response.data.order_url;
-        window.open(order_url, '_blank', 'width=800,height=600,toolbar=no,scrollbars=yes,resizable=yes');
+        if (create_response.status == 200) {
+            const order_url = create_response.data.order_url;
+            window.open(order_url, '_blank', 'width=800,height=600,toolbar=no,scrollbars=yes,resizable=yes');
+
+        }
+        else {
+            console.log("failed to create transaction")
+        }
         
     }
+
+    function formatWithDot(n) {
+        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    useEffect(() => {
+        async function fetchBalance() {
+            const result = await sendRequest(
+                `${accountApi}/get-balance/${userId}`,
+                "GET",
+                {
+                    "Content-type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                });
+            const tempBalance = parseInt(result?.balance);
+            const balance = formatWithDot(tempBalance);
+            setBalance(balance);
+        }
+        fetchBalance();
+    }, [token]);
+
     return (
         <>
             <div className="info-title mb-4">
                 <h3>Top Up Account</h3>
+            </div>
+            <div className="info-title mb-4">
+                <h4>Current balance: <span className="text-info">{balance}</span></h4>
             </div>
             <div className="info-content p-4">
                 <div>
