@@ -9,7 +9,9 @@ const config = {
     appid: "2554",
     key1: "sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn",
     key2: "trMrHtvjo6myautxDUiAcYsVtaeQ8nhf",
-    endpoint: "https://sb-openapi.zalopay.vn/v2/create"
+    create_endpoint: "https://sb-openapi.zalopay.vn/v2/create",
+    query_endpoint: "https://sb-openapi.zalopay.vn/v2/query",
+    order_expiration: 900       //15 minutes
 };
 
 module.exports = {
@@ -21,7 +23,7 @@ module.exports = {
 
         const app_time = Date.now();
 
-        const expire_duration_seconds = 900;
+        const expire_duration_seconds = config.order_expiration;
 
         const amount = +req.query.amount;
 
@@ -57,7 +59,8 @@ module.exports = {
             callback_url
         };
 
-        axios.post(config.endpoint, null, { params: params })
+        axios.post(config.
+            create_endpoint, null, { params: params })
             .then(response => {
                 if (response.data.return_code == 1) {
                     const order_url = response.data.order_url;
@@ -123,16 +126,15 @@ module.exports = {
 
         let postData = {
             app_id: config.appid,
-            app_trans_id: "<app_trans_id>", // Input your app_trans_id
+            app_trans_id: req.query.app_trans_id,
         }
 
         let data = postData.app_id + "|" + postData.app_trans_id + "|" + config.key1; // appid|app_trans_id|key1
-        postData.mac = CryptoJS.HmacSHA256(data, config.key1).toString();
-
+        postData.mac = createHmac('sha256',config.key1).update(data).digest('hex');
 
         let postConfig = {
             method: 'post',
-            url: config.endpoint,
+            url: config.query_endpoint,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },

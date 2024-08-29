@@ -19,6 +19,7 @@ const secret = "My secret";
 const searchC = require("./controllers/search.c.js");
 const adminRoute = require("./routes/admin.js");
 const topupRoute = require("./routes/topup.r.js");
+const {initializeSocket, getIO} = require('./utils/socketio-service.js')
 
 const {ProdStats, AccStats, OrderStats, CatStats} = require('./utils/statistic');
 
@@ -94,13 +95,8 @@ const server = http.createServer(app);
 //     cert: fs.readFileSync(path.join(__dirname,'cert','cert.pem'))
 // }, app);
 
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:3000",
-  },
-});
-
-
+initializeSocket(server);
+const io = getIO();
 
 io.use((socket, next) => {
   if (socket.handshake.query && socket.handshake.query.token) {
