@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken')
 const jwtSecondKey = process.env.JWT_SECOND
 const HttpError = require("../models/http-error");
 const qs = require('qs')
+const {getIO} = require('../utils/socketio-service')
 
 const config = {
     appid: "2554",
@@ -31,7 +32,7 @@ module.exports = {
 
         const description = `Zalo - Thanh toán đơn hàng ${app_trans_id}`;
 
-        const embed_data = JSON.stringify({ "amount": amount, "userID": req.query.userID });
+        const embed_data = JSON.stringify({ "amount": amount, "userID": req.query.userID, "app_trans_id": app_trans_id });
 
         const bank_code = "";
 
@@ -91,6 +92,7 @@ module.exports = {
             let data = JSON.parse(JSON.parse(req.body.data).embed_data);
             let amount = data.amount;
             let userId = data.userID;
+            let app_trans_id = data.app_trans_id;
 
             try {
                 const token = jwt.sign(
@@ -109,6 +111,14 @@ module.exports = {
                         'Content-Type': 'application/json'
                     }
                 })
+
+                const io = getIO();
+                const sockets = await io.fetchSockets();
+                for (const socket of sockets) {
+                    if (socket.handshake.query.app_trans_id == app_trans_id) {
+                        socket.emit('orderResult', {return_code: 1})
+                    }
+                }
 
                 res.sendStatus(200);
 
