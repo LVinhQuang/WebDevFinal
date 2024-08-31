@@ -3,63 +3,23 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken')
 const jwtSecondKey = process.env.JWT_SECOND
 const HttpError = require("../models/http-error");
-const qs = require('qs')
-const {getIO} = require('../utils/socketio-service')
+const { getIO } = require('../utils/socketio-service')
+const zalopay = require('../models/zalopay.m')
+const config = require("../config/zalopay-config")
 
-const config = {
-    appid: "2554",
-    key1: "sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn",
-    key2: "trMrHtvjo6myautxDUiAcYsVtaeQ8nhf",
-    create_endpoint: "https://sb-openapi.zalopay.vn/v2/create",
-    query_endpoint: "https://sb-openapi.zalopay.vn/v2/query",
-    order_expiration: 900       //15 minutes
-};
+let io;         //socket to send payment result immediately to client
 
 module.exports = {
     createOrder: async (req, res, next) => {
-
         const app_trans_id = req.query.app_trans_id;
-
-        const app_user = "ZaloPayDemo";
-
-        const app_time = Date.now();
-
         const expire_duration_seconds = config.order_expiration;
-
         const amount = +req.query.amount;
+        const userID = req.query.userID;
 
-        const item = JSON.stringify([{ "itemid": "naptien", "itemname": "Nap tien vao tai khoan", "itemprice": amount, "itemquantity": 1 }])
+        //create payment order params: app_id, app_user, app_trans_id, app_time, expire_duration_seconds, amount, item, description, embed_data, bank_code, mac, callback_url
+        const params = zalopay.createOrderParams(app_trans_id, amount, userID);
 
-        const description = `Zalo - Thanh toán đơn hàng ${app_trans_id}`;
-
-        const embed_data = JSON.stringify({ "amount": amount, "userID": req.query.userID, "app_trans_id": app_trans_id });
-
-        const bank_code = "";
-
-        const callback_url = process.env.ZALO_CALLBACK_URL + "/api/topup/zalo/callback"
-
-        //mac
-        let data_to_encode = config.appid + "|" + app_trans_id + '|' + app_user + '|' + amount + '|' + app_time + '|' + embed_data + '|' + item;
-        console.log(data_to_encode);
-        const mac = createHmac('sha256', config.key1)
-            .update(data_to_encode)
-            .digest('hex')
-
-        let params = {
-            app_id: config.appid,
-            app_user,
-            app_trans_id,
-            app_time,
-            expire_duration_seconds,
-            amount,
-            item,
-            description,
-            embed_data,
-            bank_code,
-            mac,
-            callback_url
-        };
-
+        //send create order request
         axios.post(config.
             create_endpoint, null, { params: params })
             .then(response => {
@@ -68,13 +28,42 @@ module.exports = {
                     res.status(200).json({ order_url });
                 }
                 else {
-                    console.log("FAILED WITH RETURN CODE: ", return_code);
+                    console.log("FAILED WITH RETURN CODE: ", response.data.return_code);
                     res.sendStatus(500);
                 }
             })
             .catch(e => {
                 console.log(e);
             })
+
+        //polling for order result in case callback is missed
+        let return_code = 3;        //order result: 1.success, 2.failed, 3.processing
+        const checkStatus_PostConfig = zalopay.createOrderStatus_PostConfig(params.app_trans_id);
+        const intervalID = setInterval(() => {
+            if (return_code == 3 && Date.now() <= (params.app_time + config.order_expiration * 60 * 1000)) {
+                console.log("START")
+                axios(checkStatus_PostConfig)
+                    .then(async function (response) {
+                        const data = response.data;
+                        return_code = data.return_code
+                        if (return_code != 3) {
+                            const io = getIO();
+                            const sockets = await io.fetchSockets();
+                            for (const socket of sockets) {
+                                if (socket.handshake.query.app_trans_id == params.app_trans_id) {
+                                    socket.emit('orderResult', { return_code })
+                                }
+                            }
+                        }
+                    })
+                    .catch(function (error) {
+                        console.log(error);
+                    });
+            }
+        }, 5000);
+        if (return_code != 3) {
+            clearInterval(intervalID)
+        } 
     },
 
     orderResult: async (req, res, next) => {
@@ -116,7 +105,7 @@ module.exports = {
                 const sockets = await io.fetchSockets();
                 for (const socket of sockets) {
                     if (socket.handshake.query.app_trans_id == app_trans_id) {
-                        socket.emit('orderResult', {return_code: 1})
+                        socket.emit('orderResult', { return_code: 1 })
                     }
                 }
 
@@ -134,26 +123,11 @@ module.exports = {
 
     checkOrderStatus: async (req, res, next) => {
 
-        let postData = {
-            app_id: config.appid,
-            app_trans_id: req.query.app_trans_id,
-        }
-
-        let data = postData.app_id + "|" + postData.app_trans_id + "|" + config.key1; // appid|app_trans_id|key1
-        postData.mac = createHmac('sha256',config.key1).update(data).digest('hex');
-
-        let postConfig = {
-            method: 'post',
-            url: config.query_endpoint,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            data: qs.stringify(postData)
-        };
+        const postConfig = zalopay.createOrderStatus_PostConfig(req.query.app_trans_id)
 
         axios(postConfig)
             .then(function (response) {
-                console.log(JSON.stringify(response.data));
+                console.log(response.data);
             })
             .catch(function (error) {
                 console.log(error);
